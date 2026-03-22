@@ -144,7 +144,7 @@ flowchart LR
 图 4-1. 从 Entra Gallery 创建 GitHub Enterprise Managed User 企业应用
 <!-- TODO(doc-internal): add screenshot figure 4-2 using media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg; replace with a real Entra Gallery search result screenshot before the next documentation refresh. -->
 
-### 4.2 把 Enterprise App 切到 SAML Single Sign-On，并按固定格式填写
+### 4.2 在 Entra Portal 中切换到 SAML，并按固定格式填写
 
 应用创建完成后：
 
@@ -183,7 +183,11 @@ flowchart LR
 - `Sign-on URL` 主要用于 SP-initiated SSO
 - 如果你当前只先做基本联调，也建议把三项都按官方格式填完整
 
-### 4.3 从 Entra 导出 SAML 输出，并回填 GitHub
+### 4.3 在 Entra Portal 中导出 SAML 输出值
+
+本小节中的操作全部发生在 21V Entra 的 Enterprise Application 页面内，还没有切换到 GitHub。
+
+可以把这一小节理解为“只在 Entra 里拿值，不在这一小节里改 GitHub”。
 
 在 Entra 的 `Set up single sign-on with SAML` 页面完成固定格式配置后：
 
@@ -205,8 +209,14 @@ flowchart LR
 
     图 4-5. 需要回填到 GitHub 的 Entra SSO 输出值
 
-3. 进入 GitHub enterprise 的 SAML 配置页
-4. 按下面映射回填 GitHub
+### 4.4 在 GitHub enterprise 中回填 SAML 配置
+
+本小节中的操作已经从 Entra 切换到 GitHub enterprise 管理页面。你需要把上一小节从 Entra 导出的值，逐项填写到 GitHub 中。
+
+可以把这一小节理解为“离开 Entra，进入 GitHub，只做回填，不再返回 Entra 取值”。
+
+1. 进入 GitHub enterprise 的 SAML 配置页
+2. 按下面映射回填 GitHub
 
 | GitHub 配置项 | 来源 |
 | --- | --- |
@@ -214,15 +224,16 @@ flowchart LR
 | Issuer | Entra 中复制的 `Microsoft Entra Identifier` |
 | Public Certificate | 下载的 `Base64 certificate` 文件内容 |
 
-这一步和前一小节的区别是：
+为了避免走错页面，可以把 4.2、4.3、4.4 理解成三段不同职责的动作：
 
 - 4.2 填的是 GitHub EMU 固定格式的 SP URL 模式
-- 4.3 回填的是 Entra 生成出来的 IdP 输出值
+- 4.3 导出的是 Entra 生成出来的 IdP 输出值
+- 4.4 回填的是把这些 Entra 输出值应用到 GitHub enterprise
 
 完成 GitHub 侧 SAML 配置后，认证链路才算打通。
 <!-- TODO(doc-internal): add screenshot figure 4-6 using media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg; replace with a real GitHub SAML settings screenshot. -->
 
-### 4.4 配置声明与 NameID
+### 4.5 配置声明与 NameID 对齐
 
 GitHub EMU 的 SAML 认证最终要和 SCIM 侧用户建立匹配，因此唯一标识策略必须稳定。对于当前项目，SCIM 侧主要使用：
 
@@ -248,7 +259,7 @@ flowchart TD
 
 图 4-7. SAML 认证标识与 SCIM 用户标识的关联关系
 
-### 4.5 把测试用户分配给 Enterprise App
+### 4.6 在 Entra Portal 中把测试用户分配给 Enterprise App
 
 完成 SAML 基本配置后，还需要给 Enterprise Application 分配用户或组：
 
@@ -264,7 +275,7 @@ flowchart TD
 - 不等于 GitHub SCIM provisioning 范围
 <!-- TODO(doc-internal): add screenshot figure 4-8 using media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg; replace with a real Enterprise Owner assignment screenshot. -->
 
-### 4.6 GitHub 端再做两件事
+### 4.7 在 GitHub enterprise 中完成认证后的收尾配置
 
 GitHub EMU 场景下，通常需要把认证和 SCIM 两个阶段都完成：
 
