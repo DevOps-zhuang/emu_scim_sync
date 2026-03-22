@@ -1,0 +1,23 @@
+# Ignore environment variable files that may contain secrets
+.env
+.env.*
+!.env.example
+
+# ignore local state files
+state/*.json
+
+# Ignore Python virtual environment directories
+venv/
+
+# Ignore IDE/editor specific files
+.vscode/
+
+# Ignore python cache files
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Ignore log files and state files
+logs/
+state/
+
