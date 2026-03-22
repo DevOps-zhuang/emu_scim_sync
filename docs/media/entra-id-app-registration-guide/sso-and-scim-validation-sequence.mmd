@@ -1,0 +1,19 @@
+﻿sequenceDiagram
+    participant Admin as Admin
+    participant GitHub as GitHub Enterprise
+    participant Entra as 21V Entra
+    participant Script as Sync Script
+    participant Graph as Microsoft Graph
+
+    Admin->>Entra: Add GitHub Enterprise Managed User app
+    Admin->>Entra: Configure fixed SAML URLs for enterprise slug
+    Entra-->>Admin: Login URL / Entra Identifier / Base64 certificate
+    Admin->>GitHub: Fill SAML settings and test sign-in
+    Admin->>GitHub: Enable Open SCIM configuration
+    Admin->>Entra: Create App Registration
+    Admin->>Entra: Grant Graph permissions and admin consent
+    Admin->>Script: Fill .env
+    Script->>Entra: Get access token
+    Script->>Graph: Read group members and user fields
+    Script->>GitHub: Create or update users and groups via SCIM
+    GitHub-->>Admin: Only SCIM provisioned users can sign in

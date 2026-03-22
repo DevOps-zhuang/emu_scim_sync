@@ -1,0 +1,4 @@
+﻿flowchart TD
+    A[SAML assertion] --> B[GitHub resolves external identity]
+    C[SCIM user externalId and userName] --> B
+    B --> D[Same person account is linked]

@@ -1,0 +1,19 @@
+﻿sequenceDiagram
+    participant Admin as Admin
+    participant GitHub as GitHub Enterprise
+    participant Entra as 21V Entra
+    participant Script as Sync Script
+    participant Graph as Microsoft Graph
+
+    Admin->>GitHub: Open Identity provider settings
+    GitHub-->>Admin: Provide SAML values
+    Admin->>Entra: Create and configure SAML Enterprise App
+    Entra-->>Admin: Metadata URL / Certificate / Login URL
+    Admin->>GitHub: Fill SAML settings and test sign-in
+    Admin->>GitHub: Enable Open SCIM configuration
+    Admin->>Entra: Create App Registration
+    Admin->>Entra: Grant Graph permissions and admin consent
+    Admin->>Script: Fill .env
+    Script->>Entra: Get access token
+    Script->>Graph: Read group members and user fields
+    Script->>GitHub: Create or update users and groups via SCIM

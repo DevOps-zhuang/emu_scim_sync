@@ -1,0 +1,12 @@
+﻿flowchart TD
+    A[Confirm GitHub EMU is enabled] --> B[Add GitHub Enterprise Managed User app in Entra]
+    B --> C[Configure Entra SAML with fixed GitHub URL patterns]
+    C --> D[Export Login URL Entra Identifier and Base64 certificate]
+    D --> E[Fill GitHub SAML settings and validate auth]
+    E --> F[Enable Open SCIM Configuration on GitHub]
+    F --> G[Create App Registration in 21V Entra]
+    G --> H[Record Tenant ID and Client ID]
+    H --> I[Create Client Secret]
+    I --> J[Grant Microsoft Graph app permissions]
+    J --> K[Prepare ENTRA_SYNC_GROUP_NAMES]
+    K --> L[Fill .env and run DRY_RUN validation]

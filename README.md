@@ -1,5 +1,7 @@
 # EMU SCIM Sync PoC (21V Entra -> GitHub Enterprise Managed Users)
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 This PoC implements user and group lifecycle sync from 21V Entra ID to GitHub EMU using SCIM REST API.
 
 ## Scope
@@ -35,7 +37,7 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
-4. For a Chinese step-by-step setup guide for Entra app registration and `.env` values, see [docs/entra-id-app-registration-guide.zh-cn.md](docs/entra-id-app-registration-guide.zh-cn.md).
+4. For step-by-step setup guides covering both 21V Entra SAML enterprise application setup and the daemon app registration used by this project, see [docs/entra-id-app-registration-guide.md](docs/entra-id-app-registration-guide.md) and [docs/entra-id-app-registration-guide.zh-cn.md](docs/entra-id-app-registration-guide.zh-cn.md).
 
 ## End-to-end run guide
 

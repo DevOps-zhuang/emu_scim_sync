@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f4f6f8"/>
+  <rect x="40" y="40" width="1200" height="640" rx="20" fill="#ffffff" stroke="#c8d1dc" stroke-width="4"/>
+  <text x="80" y="120" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#1f2937">Placeholder Screenshot</text>
+  <text x="80" y="180" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#374151">App Registration Overview - Tenant ID and Client ID</text>
+  <text x="80" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#4b5563">Capture the Overview page and highlight Application (client) ID and Directory (tenant) ID.</text>
+  <rect x="80" y="380" width="1120" height="220" rx="16" fill="#eef2f7" stroke="#d1d9e6" stroke-width="3" stroke-dasharray="12 10"/>
+  <text x="640" y="500" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="30" fill="#6b7280">Replace with actual portal screenshot</text>
+</svg>

@@ -1,111 +1,412 @@
-# Entra ID 应用注册与 `.env` 配置指南
+# 21V Entra 配置指南：GitHub EMU 的 SAML Enterprise App 与 SCIM Sync App Registration
 
-本文面向当前仓库的中国区场景，说明如何在 21V Entra ID 中创建用于 GitHub EMU SCIM 同步的应用注册，并获取以下配置项：
+[English](entra-id-app-registration-guide.md) | [简体中文](entra-id-app-registration-guide.zh-cn.md)
+
+本文面向当前仓库的中国区场景，覆盖两个都必须完成、且经常被混淆的实施步骤：
+
+- 步骤 1：在 21V Entra 中创建用于 GitHub Enterprise Managed Users 登录的 SAML Enterprise App
+- 步骤 2：在 21V Entra 中创建本同步程序使用的 App Registration，用于获取 `client_id`、`client_secret` 并调用 Microsoft Graph
+
+这两个步骤不是二选一关系，而是前后衔接、都必须完成：
+
+- 步骤 1 负责 GitHub EMU 的 SAML 登录认证
+- 步骤 2 负责本同步程序获取 Graph token 并读取 Entra 用户与组数据
+
+本文重点说明如何获得并填写以下配置项：
 
 - `ENTRA_TENANT_ID`
 - `ENTRA_CLIENT_ID`
 - `ENTRA_CLIENT_SECRET`
 - `ENTRA_SYNC_GROUP_NAMES`
 - Graph API 权限
+- GitHub SAML 配置所需的 IdP 元数据和字段
 
-## 1. 总体流程图
+## 1. 先理解两个对象不要混淆
 
-```mermaid
-flowchart TD
-    A[登录中国区 Entra 管理中心] --> B[新建 App Registration]
-    B --> C[记录 Tenant ID 和 Client ID]
-    C --> D[创建 Client Secret]
-    D --> E[配置 Microsoft Graph 应用权限]
-    E --> F[执行管理员同意]
-    F --> G[确认要同步的 Entra Group displayName 列表]
-    G --> H[填写 .env]
-    H --> I[本地执行 python -m src.main]
-```
-
-## 2. 前置条件
-
-在开始前，请确认：
-
-- 你可以访问中国区 Entra 管理中心：`https://entra.microsoftonline.cn/`
-- 你拥有创建应用注册和授予管理员同意的权限
-- 你已经准备好一个用于同步的 Entra 安全组
-- GitHub Enterprise Managed Users 已启用开放 SCIM 配置
-
-## 3. 创建新的 App Registration
-
-### 3.1 打开应用注册页面
-
-1. 登录中国区 Entra 管理中心：`https://entra.microsoftonline.cn/`
-2. 进入：`Microsoft Entra ID -> 应用注册 -> 新建注册`
-3. 填写应用名称，例如：
-   - `emu-scim-sync`
-   - `github-emu-sync-daemon`
-4. 建议选择：`仅此组织目录中的帐户`
-5. 对本项目来说，不需要配置 Web 重定向 URI，可以留空
-6. 点击“注册”
-
-### 3.2 注册后的结果图
+很多实施问题都来自把“企业应用程序”和“应用注册”当成同一个东西。对于当前项目，它们职责不同。
 
 ```mermaid
 flowchart LR
-    A[应用注册概览页] --> B[目录(租户) ID]
-    A --> C[应用程序(客户端) ID]
-    A --> D[证书和机密]
-    A --> E[API 权限]
+    A[21V Entra] --> B[Enterprise Application<br/>用于 GitHub EMU SAML 登录]
+    A --> C[App Registration<br/>用于本同步脚本调用 Microsoft Graph]
+    B --> D[GitHub Enterprise Managed Users 登录认证]
+    C --> E[Python Sync Script]
+    E --> F[Microsoft Graph]
+    E --> G[GitHub SCIM REST API]
 ```
 
-## 4. 获取 Tenant ID 与 Client ID
+![步骤关系图](media/entra-id-app-registration-guide/saml-and-sync-app-overview.svg)
 
-创建完成后，进入应用注册的“概览”页，记录以下两个值：
+图 1-1. Enterprise Application 与 App Registration 的职责边界
+
+### 职责对照
+
+| 对象 | 在 Entra 中的位置 | 主要用途 | 是否提供 Client ID / Secret 给本脚本 |
+| --- | --- | --- | --- |
+| Enterprise Application | Enterprise applications | 给 GitHub EMU 做 SAML SSO | 否 |
+| App Registration | App registrations | 给本项目拿 token 读 Graph | 是 |
+
+## 2. 总体实施顺序
+
+建议按下面顺序执行，避免重复回填配置。
+
+```mermaid
+flowchart TD
+    A[确认 GitHub Enterprise 已开启 EMU] --> B[在 21V Entra 中添加 GitHub Enterprise Managed User 企业应用]
+    B --> C[在 Entra 中切换到 SAML 并按固定格式填写 Basic SAML Configuration]
+    C --> D[下载 Base64 证书并复制 Login URL 与 Microsoft Entra Identifier]
+    D --> E[在 GitHub 侧填写 Entra 输出并完成 SAML 联调]
+    E --> F[在 GitHub 端启用 Open SCIM Configuration]
+    F --> G[在 21V Entra 创建 App Registration]
+    G --> H[记录 Tenant ID 与 Client ID]
+    H --> I[创建 Client Secret]
+    I --> J[配置 Microsoft Graph 应用权限并管理员同意]
+    J --> K[准备 ENTRA_SYNC_GROUP_NAMES]
+    K --> L[填写 .env 并执行 DRY_RUN 验证]
+```
+
+![总体实施顺序图](media/entra-id-app-registration-guide/overall-implementation-sequence.svg)
+
+图 2-1. 建议的端到端实施顺序
+
+## 3. 前置条件
+
+开始前请确认：
+
+- 可以访问 21V Entra 管理中心：`https://entra.microsoftonline.cn/`
+- 具备以下至少一种角色：`Application Administrator` 或 `Cloud Application Administrator`
+- GitHub Enterprise 已启用 Enterprise Managed Users
+- 你能以 enterprise setup user 或 enterprise owner 身份进入 GitHub enterprise 的 Identity provider 配置页
+- 已明确本项目要同步的 Entra 安全组名称
+
+## 4. 步骤 1：新建 SAML Enterprise App，用于 GitHub EMU 登录
+
+这一部分解决“用户如何通过 Entra SAML 登录 GitHub EMU”。它不负责给本同步脚本发 Graph token。
+
+### 4.0 本步骤交付结构
+
+目标：
+
+- 建立 GitHub EMU 到 21V Entra 的 SAML 认证链路
+- 让测试管理员先完成一次可验证的 SSO 登录
+
+输入：
+
+- GitHub enterprise slug
+- 可登录 21V Entra 的管理员账号
+- 可访问 GitHub enterprise Identity provider 页面的 setup user 或 enterprise owner
+
+产出：
+
+- 一个可用的 GitHub Enterprise Managed User 企业应用
+- GitHub 侧已填写 Login URL、Issuer、Public Certificate
+- 至少一个测试用户已被分配到企业应用
+
+检查点：
+
+- Entra 中可以看到 Enterprise Application 已创建并切换到 SAML
+- GitHub 侧已启用 Open SCIM configuration
+- 测试用户已具备完成首次登录验证的条件
+
+### 4.1 在 21V Entra 创建 Enterprise Application
+
+根据 Microsoft Learn 的 GitHub EMU SAML 指南，步骤顺序应该先从 Entra 侧添加 GitHub Enterprise Managed User 企业应用，而不是先去 GitHub 侧抄 SAML 参数。
+
+推荐按官方 Gallery 应用执行：
+
+1. 登录 21V Entra 管理中心
+2. 进入 `Microsoft Entra ID -> Enterprise applications -> New application`
+3. 在搜索框输入 `GitHub Enterprise Managed User`
+4. 从结果中选择 `GitHub Enterprise Managed User`
+5. 点击 `Create`，等待应用加入当前租户
+
+建议命名可以保留官方默认名称，或者按企业 slug 调整为更容易识别的名称，例如：
+
+- `GitHub Enterprise Managed User - contoso`
+- `GitHub EMU SAML - contoso`
+
+这里的显示名称主要影响管理可读性。真正需要按固定格式填写的是下一步 `Basic SAML Configuration` 中的 URL，而不是应用显示名称。
+
+门户路径图：
+
+```mermaid
+flowchart LR
+    A[Microsoft Entra admin center] --> B[Enterprise applications]
+    B --> C[New application]
+    C --> D[搜索 GitHub Enterprise Managed User]
+    D --> E[选择 GitHub Enterprise Managed User]
+    E --> F[Create]
+    F --> G[Single sign-on -> SAML]
+```
+
+![Enterprise Application 创建路径图](media/entra-id-app-registration-guide/enterprise-app-gallery-creation-flow.svg)
+
+图 4-1. 从 Entra Gallery 创建 GitHub Enterprise Managed User 企业应用
+
+建议在这里补一张真实门户截图，展示搜索结果页中如何选中 GitHub Enterprise Managed User：
+
+![Enterprise Application 搜索结果占位图](media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg)
+
+图 4-2. 建议补充的真实截图：Entra Gallery 中的 GitHub Enterprise Managed User 搜索结果
+
+### 4.2 把 Enterprise App 切到 SAML Single Sign-On，并按固定格式填写
+
+应用创建完成后：
+
+1. 进入该 Enterprise Application
+2. 打开 `Single sign-on`
+3. 选择 `SAML`
+4. 打开 `Basic SAML Configuration`
+
+下图展示了 `Basic SAML Configuration` 卡片的编辑入口。点击右上角 `Edit` 后，按下面的固定格式填写三个 URL：
+
+![Basic SAML Configuration 编辑入口](media/entra-id-app-registration-guide/saml-basic-configuration-edit-button.png)
+
+图 4-3. Basic SAML Configuration 卡片的编辑入口
+
+这一页需要填写的核心 URL 是固定模式，不是先从 GitHub 页面复制。你只需要把 `{enterprise}` 替换成自己的 GitHub enterprise slug。
+
+例如，如果你的企业地址是：
+
+- `https://github.com/enterprises/contoso`
+
+那么 `{enterprise}` 就是：
+
+- `contoso`
+
+按 Microsoft Learn 的要求填写如下：
+
+| Entra SAML 字段 | 固定格式 |
+| --- | --- |
+| Identifier (Entity ID) | `https://github.com/enterprises/{enterprise}` |
+| Reply URL (Assertion Consumer Service URL) | `https://github.com/enterprises/{enterprise}/saml/consume` |
+| Sign-on URL | `https://github.com/enterprises/{enterprise}/sso` |
+
+注意事项：
+
+- `Identifier` 不能带结尾斜杠 `/`
+- `Sign-on URL` 主要用于 SP-initiated SSO
+- 如果你当前只先做基本联调，也建议把三项都按官方格式填完整
+
+### 4.3 从 Entra 导出 SAML 输出，并回填 GitHub
+
+在 Entra 的 `Set up single sign-on with SAML` 页面完成固定格式配置后：
+
+1. 在 `SAML Certificates` 区域下载 `Base64 certificate`
+
+    下图展示了 `Certificate (Base64)` 的下载位置：
+
+    ![Base64 certificate 下载位置](media/entra-id-app-registration-guide/saml-certificate-base64-download.png)
+
+    图 4-4. Certificate (Base64) 下载位置
+
+2. 在 `Set up GitHub Enterprise Managed User` 区域复制以下值：
+   - `Login URL`
+   - `Microsoft Entra Identifier`
+
+    下图展示了需要复制到 GitHub 的两个关键值：
+
+    ![Entra SSO 输出值](media/entra-id-app-registration-guide/entra-sso-configuration-values.png)
+
+    图 4-5. 需要回填到 GitHub 的 Entra SSO 输出值
+
+3. 进入 GitHub enterprise 的 SAML 配置页
+4. 按下面映射回填 GitHub
+
+| GitHub 配置项 | 来源 |
+| --- | --- |
+| Sign-on URL | Entra 中复制的 `Login URL` |
+| Issuer | Entra 中复制的 `Microsoft Entra Identifier` |
+| Public Certificate | 下载的 `Base64 certificate` 文件内容 |
+
+这一步和前一小节的区别是：
+
+- 4.2 填的是 GitHub EMU 固定格式的 SP URL 模式
+- 4.3 回填的是 Entra 生成出来的 IdP 输出值
+
+完成 GitHub 侧 SAML 配置后，认证链路才算打通。
+
+建议在这里补一张 GitHub 企业侧页面截图，减少回填字段时的来回切换成本：
+
+![GitHub SAML 字段占位图](media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg)
+
+图 4-6. 建议补充的真实截图：GitHub enterprise SAML 配置页中的 Sign-on URL、Issuer、Public Certificate 字段
+
+### 4.4 配置声明与 NameID
+
+GitHub EMU 的 SAML 认证最终要和 SCIM 侧用户建立匹配，因此唯一标识策略必须稳定。对于当前项目，SCIM 侧主要使用：
+
+- `externalId` <- Entra `id`
+- `userName` <- Entra `userPrincipalName`
+
+SAML 部分建议：
+
+- 优先使用 GitHub 文档要求的唯一标识字段
+- 如果 GitHub 页面没有额外要求，通常应避免使用会频繁变化的展示性字段
+- 确保认证侧用户标识与 SCIM 侧匹配规则兼容
+
+可采用如下检查思路：
+
+```mermaid
+flowchart TD
+    A[SAML 登录断言] --> B[GitHub 识别外部身份]
+    C[SCIM 用户 externalId userName] --> B
+    B --> D[同一自然人账号被关联]
+```
+
+![SAML 与 SCIM 关联图](media/entra-id-app-registration-guide/saml-scim-identity-linking.svg)
+
+图 4-7. SAML 认证标识与 SCIM 用户标识的关联关系
+
+### 4.5 把测试用户分配给 Enterprise App
+
+完成 SAML 基本配置后，还需要给 Enterprise Application 分配用户或组：
+
+1. 进入 `Users and groups`
+2. 先分配一个测试用户
+3. 在角色选择中，优先给测试管理员分配 `Enterprise Owner`
+4. 再执行一次 GitHub 登录验证
+
+注意：
+
+- 这一步只影响“谁能通过该 Enterprise App 做 SAML 登录”
+- 不等于本项目的 Graph 读取范围
+- 不等于 GitHub SCIM provisioning 范围
+
+建议在这里补一张真实截图，展示测试用户分配到 Enterprise Owner 角色的页面：
+
+![Enterprise Owner 分配占位图](media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg)
+
+图 4-8. 建议补充的真实截图：Enterprise App 中测试用户与 Enterprise Owner 角色分配
+
+### 4.6 GitHub 端再做两件事
+
+GitHub EMU 场景下，通常需要把认证和 SCIM 两个阶段都完成：
+
+1. 完成 SAML 认证配置
+2. 在 `Identity provider -> Single sign-on configuration` 下启用 `Open SCIM configuration`
+
+GitHub 官方约束要点：
+
+- 先配置认证，再配置 SCIM
+- 如果使用非 partner IdP application 的 SCIM 方式，本项目这种“自定义脚本调用 GitHub SCIM REST API”的方式是可行的
+- 认证和 provisioning 的唯一标识要兼容，否则登录后无法与已 provision 的账号正确关联
+- 即使 SAML 已配置完成，用户也必须先经过 SCIM provision，才能真正登录并访问 enterprise
+
+## 5. 步骤 2：创建本同步程序使用的 App Registration
+
+这一部分是给本项目获取 Graph token 用的，不负责 GitHub 登录。
+
+### 5.0 本步骤交付结构
+
+目标：
+
+- 创建供同步程序使用的 App Registration
+- 获取 Tenant ID、Client ID、Client Secret，并完成 Graph 权限授权
+
+输入：
+
+- 已确认的 21V Entra 租户
+- 可创建应用注册和执行管理员同意的管理员权限
+- 已确定的同步组范围
+
+产出：
+
+- 可用于 client credentials flow 的 App Registration
+- 已保存到 .env 的 ENTRA_TENANT_ID、ENTRA_CLIENT_ID、ENTRA_CLIENT_SECRET
+- 已完成管理员同意的 Graph Application permissions
+
+检查点：
+
+- Token endpoint 可成功签发 access token
+- Graph 可读取目标组 direct members 和用户属性
+- DRY_RUN 首次执行时能正确解析组并输出计划变更
+
+### 5.1 打开 App Registration 页面
+
+1. 登录中国区 Entra 管理中心：`https://entra.microsoftonline.cn/`
+2. 进入 `Microsoft Entra ID -> App registrations -> New registration`
+3. 填写应用名称，例如：
+   - `emu-scim-sync`
+   - `github-emu-sync-daemon`
+4. 建议选择 `Accounts in this organizational directory only`
+5. 当前项目不需要 Web redirect URI，可留空
+6. 点击 `Register`
+
+创建完成后的结构图：
+
+```mermaid
+flowchart LR
+    A[App registration Overview] --> B[Application client ID]
+    A --> C[Directory tenant ID]
+    A --> D[Certificates and secrets]
+    A --> E[API permissions]
+```
+
+![App Registration 结构图](media/entra-id-app-registration-guide/graph-app-registration-overview.svg)
+
+图 5-1. App Registration 概览页的关键对象结构
+
+### 5.2 获取 Tenant ID 与 Client ID
+
+创建完成后，在概览页记录以下字段：
 
 | Entra 门户字段 | `.env` 字段 | 说明 |
 | --- | --- | --- |
-| 目录(租户) ID | `ENTRA_TENANT_ID` | 你的 Entra 租户唯一标识 |
-| 应用程序(客户端) ID | `ENTRA_CLIENT_ID` | 当前同步程序使用的客户端标识 |
+| Directory (tenant) ID | `ENTRA_TENANT_ID` | Entra 租户唯一标识 |
+| Application (client) ID | `ENTRA_CLIENT_ID` | 当前同步程序的客户端标识 |
 
-`.env` 示例：
+示例：
 
 ```dotenv
 ENTRA_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ENTRA_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-## 5. 创建 Client Secret
+建议在这里补一张真实截图，直接标出 Overview 页上的 Application (client) ID 与 Directory (tenant) ID：
 
-### 5.1 创建步骤
+![Overview ID 占位图](media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg)
 
-1. 在该 App Registration 左侧进入：`证书和机密`
-2. 选择：`客户端密码`
-3. 点击：`新建客户端密码`
-4. 填写描述，例如：`emu-scim-sync-local`
+图 5-2. 建议补充的真实截图：App Registration Overview 中的 Tenant ID 与 Client ID
+
+### 5.3 创建 Client Secret
+
+1. 进入 `Certificates & secrets`
+2. 打开 `Client secrets`
+3. 点击 `New client secret`
+4. 输入描述，例如 `emu-scim-sync-prod`
 5. 选择有效期
-6. 点击“添加”
+6. 点击 `Add`
 
-### 5.2 最重要的注意事项
+最容易出错的点：
 
-创建成功后，页面会显示两类信息：
+- 页面会显示 `Secret ID`
+- 也会显示 `Value`
 
-- Secret ID
-- Value
-
-你需要写入 `.env` 的是：
+你必须保存到 `.env` 的是：
 
 - `Value`
 
-不是：
+而不是：
 
-- Secret ID
-- 描述名称
+- `Secret ID`
+- secret 的描述名称
 
-### 5.3 `.env` 示例
+配置示例：
 
 ```dotenv
 ENTRA_CLIENT_SECRET=your-secret-value
 ```
 
-## 6. 配置 Microsoft Graph 权限
+建议在这里补一张真实截图，强调必须复制 Value 而不是 Secret ID：
 
-当前仓库会读取指定 Entra 组内的用户，并获取这些字段：
+![Client Secret Value 占位图](media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg)
+
+图 5-3. 建议补充的真实截图：Client Secret 页面中应复制的 Value 字段
+
+## 6. 给 App Registration 配置 Microsoft Graph 应用权限
+
+当前项目会从 Entra 组中读取 direct members，并读取这些用户字段：
 
 - `id`
 - `userPrincipalName`
@@ -114,78 +415,95 @@ ENTRA_CLIENT_SECRET=your-secret-value
 - `department`
 - `accountEnabled`
 
-代码入口在：
+对应代码在 [src/graph_client.py](../src/graph_client.py)。
 
-- [src/graph_client.py](../src/graph_client.py)
+### 6.1 推荐最小权限起点
 
-### 6.1 推荐权限
-
-请在 App Registration 中进入：`API 权限 -> 添加权限 -> Microsoft Graph -> 应用程序权限`，添加：
+进入 `API permissions -> Add a permission -> Microsoft Graph -> Application permissions`，添加：
 
 1. `GroupMember.Read.All`
 2. `User.Read.All`
 
-这两个权限是当前项目最合适的起点：
+含义：
 
 - `GroupMember.Read.All`：读取组成员关系
-- `User.Read.All`：读取用户完整属性
+- `User.Read.All`：读取用户属性
 
-### 6.2 更宽的兜底权限
+### 6.2 如果字段仍不完整
 
-如果你的租户策略导致某些用户字段仍返回不完整，可以考虑：
+如果租户策略导致部分字段仍不可见，可考虑增加：
 
 - `Directory.Read.All`
 
-但建议先尝试较小权限集合，再按需放宽。
+但建议先从较小权限集合开始。
 
-### 6.3 管理员同意
+### 6.3 一定要执行管理员同意
 
-添加完权限后，必须执行：
+添加应用程序权限后，必须点击：
 
-- `授予管理员同意`
+- `Grant admin consent`
 
-否则即使令牌可以获取，后续 Graph API 也可能返回 403 或字段不完整。
+否则你可能会遇到：
 
-## 7. 确认同步组名称
+- token 可以获取，但 Graph 返回 403
+- 返回字段不完整
 
-### 7.1 门户方式
+建议在这里补一张真实截图，展示权限列表和 Grant admin consent 按钮：
 
-1. 进入：`Microsoft Entra ID -> 组`
-2. 确认你要同步的安全组名称
-3. 记录每个目标组的 `名称`（displayName）
-4. 将这些名称填写到：`ENTRA_SYNC_GROUP_NAMES`
+![API 权限管理员同意占位图](media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg)
 
-### 7.2 `.env` 示例
+图 6-1. 建议补充的真实截图：API permissions 与 Grant admin consent
+
+## 7. 准备同步组配置
+
+### 7.1 在 Entra 中确认组 displayName
+
+1. 进入 `Microsoft Entra ID -> Groups`
+2. 找到要纳入同步范围的安全组
+3. 记录这些组的 `displayName`
+4. 填入 `ENTRA_SYNC_GROUP_NAMES`
+
+示例：
 
 ```dotenv
 ENTRA_SYNC_GROUP_NAMES=GitHub-EMU-Platform,GitHub-EMU-SRE,SanhuaGroup
 ```
 
-说明：
+建议在这里补一张真实截图，展示 Groups 列表中的 displayName：
 
-- 当前实现按 Entra security group 的 displayName 解析目标组
-- 如果某个组名不存在，或同名解析到多个安全组，程序会失败关闭
-- 当前范围只取每个组的 direct members，不展开 nested groups
+![Groups displayName 占位图](media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg)
 
-## 8. 中国区端点配置
+图 7-1. 建议补充的真实截图：用于 ENTRA_SYNC_GROUP_NAMES 的 Entra 组 displayName
 
-当前仓库默认已经面向 21V 中国区，推荐保持如下配置：
+重要语义：
+
+- 当前实现按 displayName 解析目标安全组
+- 如果组名不存在或出现歧义，程序会 fail closed
+- 当前仅取 direct members，不展开 nested groups
+
+## 8. 中国区端点与 GitHub 侧关键配置
+
+当前仓库默认面向 21V 中国区，推荐保持如下配置：
 
 ```dotenv
 ENTRA_TOKEN_URL=https://login.partner.microsoftonline.cn/{tenant_id}/oauth2/v2.0/token
 GRAPH_BASE_URL=https://microsoftgraph.chinacloudapi.cn/v1.0
+GITHUB_SCIM_BASE_URL=https://api.github.com/scim/v2/enterprises/{enterprise}
 ```
 
 说明：
 
-- `ENTRA_TOKEN_URL`：中国区 Entra OAuth token endpoint
-- `GRAPH_BASE_URL`：中国区 Microsoft Graph endpoint
+- `ENTRA_TOKEN_URL`：中国区 OAuth token endpoint
+- `GRAPH_BASE_URL`：中国区 Graph endpoint
+- `GITHUB_SCIM_BASE_URL`：GitHub EMU SCIM endpoint
 
-通常不需要手工修改这两个值。
+此外 GitHub SCIM 官方还要求：
 
-## 9. `.env` 对照表
+- 使用 classic PAT
+- 具备 `scim:enterprise`
+- 请求带非空 `User-Agent`
 
-推荐最终填写如下：
+## 9. 建议的 `.env` 完整示例
 
 ```dotenv
 # General
@@ -207,38 +525,48 @@ GITHUB_PAT=ghp_xxx
 GITHUB_USER_AGENT=emu-scim-sync/0.1
 GITHUB_ENTERPRISE_ADMIN_UPNS=admin1@contoso.cn,admin2@contoso.cn
 
-# Local state
+# Local state and logging
 STATE_FILE=state/sync_state.json
+LOG_FORMAT=text
+LOG_FILE=logs/emu_scim_sync.log
+LOG_FILE_BACKUP_COUNT=5
 ```
 
-## 10. 验证顺序
-
-建议按以下顺序验证：
+## 10. 联调与验证顺序
 
 ```mermaid
 sequenceDiagram
-    participant U as 用户
-    participant E as Entra ID
-    participant G as Microsoft Graph
-    participant S as Sync Script
-    participant GH as GitHub SCIM
+    participant Admin as 管理员
+    participant GitHub as GitHub Enterprise
+    participant Entra as 21V Entra
+    participant Script as Sync Script
+    participant Graph as Microsoft Graph
 
-    U->>S: python -m src.main
-    S->>E: 获取 access token
-    E-->>S: token
-    S->>G: 读取组成员
-    G-->>S: 用户列表
-    S->>GH: 创建或更新 SCIM 用户
-    GH-->>S: 成功响应
+    Admin->>GitHub: 打开 Identity provider 配置
+    GitHub-->>Admin: 提供 SAML 所需参数
+    Admin->>Entra: 创建并配置 SAML Enterprise App
+    Entra-->>Admin: Metadata URL / Certificate / Login URL
+    Admin->>GitHub: 回填 SAML 配置并测试登录
+    Admin->>GitHub: 启用 Open SCIM configuration
+    Admin->>Entra: 创建 App Registration
+    Admin->>Entra: 配置 Graph 权限并管理员同意
+    Admin->>Script: 填写 .env
+    Script->>Entra: 获取 access token
+    Script->>Graph: 读取组成员与用户属性
+    Script->>GitHub: 通过 SCIM 创建或更新用户和组
 ```
 
-第一次验证建议保持：
+![联调与验证顺序图](media/entra-id-app-registration-guide/sso-and-scim-validation-sequence.svg)
+
+图 10-1. GitHub SSO 与 SCIM 同步的联调顺序
+
+第一次执行建议始终保持：
 
 ```dotenv
 DRY_RUN=true
 ```
 
-当日志确认用户识别正确后，再切换为：
+只有当日志确认用户识别、组解析和目标变更都正确后，再切换为：
 
 ```dotenv
 DRY_RUN=false
@@ -246,60 +574,125 @@ DRY_RUN=false
 
 ## 11. 常见错误与排查
 
-### 11.1 `401 Unauthorized` at token endpoint
+### 11.1 看不到 `Certificates & secrets`
+
+通常是因为你打开的是：
+
+- Enterprise applications
+
+而不是：
+
+- App registrations
+
+前者用于 SAML 企业应用；后者才是本项目获取 client secret 的地方。
+
+### 11.2 token endpoint 返回 401
 
 常见原因：
 
-- `ENTRA_CLIENT_SECRET` 仍是占位值
-- 填错了 Secret ID，而不是 Secret Value
-- Secret 已过期
+- `ENTRA_CLIENT_SECRET` 填的是占位值
+- 误用了 `Secret ID` 而不是 `Value`
+- secret 已过期
 - `ENTRA_CLIENT_ID` 与租户不匹配
 
-### 11.2 Graph 返回 403 或用户字段为空
+### 11.3 Graph 返回 403 或字段不完整
 
 常见原因：
 
-- 没有给 App Registration 添加应用程序权限
+- 没有配置 Application permissions
 - 没有执行管理员同意
-- 只给了组成员权限，没有给用户读取权限
+- 只给了组权限，没有用户读取权限
 
-### 11.3 GitHub 侧没有新增用户
+### 11.4 GitHub 登录能打开，但用户无法正常关联到已 provision 账号
+
+常见原因：
+
+- SAML 侧唯一标识与 SCIM 侧匹配策略不兼容
+- 用户尚未被本同步器 provision
+- 用户不在同步范围组的 direct members 中
+
+### 11.5 GitHub 没有新增用户
 
 先检查：
 
-- `.env` 中是否仍是 `DRY_RUN=true`
+- `.env` 是否仍为 `DRY_RUN=true`
 - `GITHUB_PAT` 是否具备 `scim:enterprise`
-- `GITHUB_ENTERPRISE` 是否是正确的 enterprise slug
+- `GITHUB_ENTERPRISE` 是否正确
+- GitHub enterprise 是否已启用 `Open SCIM configuration`
 
-### 11.4 找不到“证书和机密”
+### 11.6 组里有用户但程序没同步
 
-如果你当前打开的是：
+常见原因：
 
-- 企业应用程序 `Enterprise applications`
+- 用户是 nested group 成员，而不是 direct member
+- `ENTRA_SYNC_GROUP_NAMES` 写错 displayName
+- 同名组导致解析歧义
 
-那么看不到 `Certificates & secrets` 是正常的。你需要进入的是：
+## 12. 配图完成度与替换清单
 
-- 应用注册 `App registrations`
+当前文档已经具备“可直接交付”的配图骨架，共分两类：
 
-## 12. 官方参考文档
+1. 已有正式图或真实截图，可直接用于客户阅读
+2. 已经插入到正确步骤中的占位图，等待你用真实门户截图同名覆盖
+
+### 12.1 已完成的正式图与真实截图
+
+1. 图 1-1：两个 Entra 对象的职责边界图
+2. 图 2-1：总体实施顺序图
+3. 图 4-1：Enterprise Application 创建路径图
+4. 图 4-3：Basic SAML Configuration 编辑入口截图
+5. 图 4-4：Base64 certificate 下载位置截图
+6. 图 4-5：Entra SSO 输出值截图
+7. 图 4-7：SAML 与 SCIM 关联图
+8. 图 5-1：App Registration 结构图
+9. 图 10-1：联调与验证顺序图
+
+### 12.2 待你补真实截图并直接覆盖的占位图
+
+1. 图 4-2：Entra Gallery 搜索 GitHub Enterprise Managed User
+    建议文件名：media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg
+2. 图 4-6：GitHub enterprise SAML 字段页
+    建议文件名：media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg
+3. 图 4-8：Enterprise App 用户与 Enterprise Owner 分配页
+    建议文件名：media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg
+4. 图 5-2：App Registration Overview 中的 Tenant ID / Client ID
+    建议文件名：media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg
+5. 图 5-3：Client Secret Value 复制页
+    建议文件名：media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg
+6. 图 6-1：API permissions 与 Grant admin consent
+    建议文件名：media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg
+7. 图 7-1：Entra Groups 中的 displayName 列表
+    建议文件名：media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg
+
+如果后续修改了本文中的 Mermaid 图，可以运行下面的脚本一键重新导出图片：
+
+- `powershell -File scripts/render-entra-id-guide-diagrams.ps1 -Format svg`
+- `powershell -File scripts/render-entra-id-guide-diagrams.ps1 -Format both`
+
+## 13. 官方参考
 
 Microsoft 官方：
 
-- 应用注册快速开始：`https://learn.microsoft.com/zh-cn/entra/identity-platform/quickstart-register-app`
-- 注册应用并创建服务主体：`https://learn.microsoft.com/zh-cn/entra/identity-platform/howto-create-service-principal-portal`
-- OAuth 2.0 客户端凭据流：`https://learn.microsoft.com/zh-cn/entra/identity-platform/v2-oauth2-client-creds-grant-flow`
-- Graph 组成员接口权限：`https://learn.microsoft.com/zh-cn/graph/api/group-list-members?view=graph-rest-1.0`
+- Enterprise Application 创建快速开始：https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/add-application-portal
+- 应用注册快速开始：https://learn.microsoft.com/zh-cn/entra/identity-platform/quickstart-register-app
+- 注册应用并创建服务主体：https://learn.microsoft.com/zh-cn/entra/identity-platform/howto-create-service-principal-portal
+- OAuth 2.0 客户端凭据流：https://learn.microsoft.com/zh-cn/entra/identity-platform/v2-oauth2-client-creds-grant-flow
+- Graph 组成员接口权限：https://learn.microsoft.com/zh-cn/graph/api/group-list-members?view=graph-rest-1.0
+- Configure a GitHub enterprise with Enterprise Managed Users for SAML Single sign-on with Microsoft Entra ID：https://learn.microsoft.com/en-us/entra/identity/saas-apps/github-enterprise-managed-user-tutorial?source=recommendations
 
 GitHub 官方：
 
-- SCIM for EMU：`https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/provisioning-user-accounts-with-scim/provisioning-users-and-groups-with-scim-using-the-rest-api`
-- SCIM REST API：`https://docs.github.com/en/enterprise-cloud@latest/rest/enterprise-admin/scim`
+- 配置 EMU 认证：https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/configuring-authentication-for-enterprise-managed-users
+- 配置 EMU SCIM provisioning：https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/provisioning-user-accounts-with-scim/configuring-scim-provisioning-for-enterprise-managed-users
+- 使用 REST API 进行 SCIM provisioning：https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/provisioning-user-accounts-with-scim/provisioning-users-and-groups-with-scim-using-the-rest-api
+- SCIM REST API：https://docs.github.com/en/enterprise-cloud@latest/rest/enterprise-admin/scim
 
-## 13. 当前项目中的相关文件
+## 14. 当前仓库中的相关文件
 
 - [src/config.py](../src/config.py)
 - [src/graph_client.py](../src/graph_client.py)
 - [src/main.py](../src/main.py)
 - [src/sync_engine.py](../src/sync_engine.py)
 - [README.md](../README.md)
+- [README.zh-CN.md](../README.zh-CN.md)
 - [.env.example](../.env.example)
