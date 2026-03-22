@@ -65,7 +65,7 @@ flowchart TD
     K --> L[填写 .env 并执行 DRY_RUN 验证]
 ```
 
-![总体实施顺序图](media/entra-id-app-registration-guide/overall-implementation-sequence.svg)
+<img src="media/entra-id-app-registration-guide/overall-implementation-sequence.svg" alt="总体实施顺序图" width="1200" />
 
 图 2-1. 建议的端到端实施顺序
 
@@ -142,12 +142,7 @@ flowchart LR
 ![Enterprise Application 创建路径图](media/entra-id-app-registration-guide/enterprise-app-gallery-creation-flow.svg)
 
 图 4-1. 从 Entra Gallery 创建 GitHub Enterprise Managed User 企业应用
-
-建议在这里补一张真实门户截图，展示搜索结果页中如何选中 GitHub Enterprise Managed User：
-
-![Enterprise Application 搜索结果占位图](media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg)
-
-图 4-2. 建议补充的真实截图：Entra Gallery 中的 GitHub Enterprise Managed User 搜索结果
+<!-- TODO(doc-internal): add screenshot figure 4-2 using media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg; replace with a real Entra Gallery search result screenshot before the next documentation refresh. -->
 
 ### 4.2 把 Enterprise App 切到 SAML Single Sign-On，并按固定格式填写
 
@@ -225,12 +220,7 @@ flowchart LR
 - 4.3 回填的是 Entra 生成出来的 IdP 输出值
 
 完成 GitHub 侧 SAML 配置后，认证链路才算打通。
-
-建议在这里补一张 GitHub 企业侧页面截图，减少回填字段时的来回切换成本：
-
-![GitHub SAML 字段占位图](media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg)
-
-图 4-6. 建议补充的真实截图：GitHub enterprise SAML 配置页中的 Sign-on URL、Issuer、Public Certificate 字段
+<!-- TODO(doc-internal): add screenshot figure 4-6 using media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg; replace with a real GitHub SAML settings screenshot. -->
 
 ### 4.4 配置声明与 NameID
 
@@ -272,12 +262,7 @@ flowchart TD
 - 这一步只影响“谁能通过该 Enterprise App 做 SAML 登录”
 - 不等于本项目的 Graph 读取范围
 - 不等于 GitHub SCIM provisioning 范围
-
-建议在这里补一张真实截图，展示测试用户分配到 Enterprise Owner 角色的页面：
-
-![Enterprise Owner 分配占位图](media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg)
-
-图 4-8. 建议补充的真实截图：Enterprise App 中测试用户与 Enterprise Owner 角色分配
+<!-- TODO(doc-internal): add screenshot figure 4-8 using media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg; replace with a real Enterprise Owner assignment screenshot. -->
 
 ### 4.6 GitHub 端再做两件事
 
@@ -362,12 +347,7 @@ flowchart LR
 ENTRA_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ENTRA_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
-
-建议在这里补一张真实截图，直接标出 Overview 页上的 Application (client) ID 与 Directory (tenant) ID：
-
-![Overview ID 占位图](media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg)
-
-图 5-2. 建议补充的真实截图：App Registration Overview 中的 Tenant ID 与 Client ID
+<!-- TODO(doc-internal): add screenshot figure 5-2 using media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg; replace with a real Overview IDs screenshot. -->
 
 ### 5.3 创建 Client Secret
 
@@ -397,12 +377,7 @@ ENTRA_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```dotenv
 ENTRA_CLIENT_SECRET=your-secret-value
 ```
-
-建议在这里补一张真实截图，强调必须复制 Value 而不是 Secret ID：
-
-![Client Secret Value 占位图](media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg)
-
-图 5-3. 建议补充的真实截图：Client Secret 页面中应复制的 Value 字段
+<!-- TODO(doc-internal): add screenshot figure 5-3 using media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg; replace with a real Client Secret Value screenshot. -->
 
 ## 6. 给 App Registration 配置 Microsoft Graph 应用权限
 
@@ -447,12 +422,7 @@ ENTRA_CLIENT_SECRET=your-secret-value
 
 - token 可以获取，但 Graph 返回 403
 - 返回字段不完整
-
-建议在这里补一张真实截图，展示权限列表和 Grant admin consent 按钮：
-
-![API 权限管理员同意占位图](media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg)
-
-图 6-1. 建议补充的真实截图：API permissions 与 Grant admin consent
+<!-- TODO(doc-internal): add screenshot figure 6-1 using media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg; replace with a real API permissions screenshot. -->
 
 ## 7. 准备同步组配置
 
@@ -468,12 +438,7 @@ ENTRA_CLIENT_SECRET=your-secret-value
 ```dotenv
 ENTRA_SYNC_GROUP_NAMES=GitHub-EMU-Platform,GitHub-EMU-SRE,SanhuaGroup
 ```
-
-建议在这里补一张真实截图，展示 Groups 列表中的 displayName：
-
-![Groups displayName 占位图](media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg)
-
-图 7-1. 建议补充的真实截图：用于 ENTRA_SYNC_GROUP_NAMES 的 Entra 组 displayName
+<!-- TODO(doc-internal): add screenshot figure 7-1 using media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg; replace with a real Entra Groups screenshot. -->
 
 重要语义：
 
@@ -628,41 +593,29 @@ DRY_RUN=false
 - `ENTRA_SYNC_GROUP_NAMES` 写错 displayName
 - 同名组导致解析歧义
 
-## 12. 配图完成度与替换清单
+## 12. 配图维护说明
 
-当前文档已经具备“可直接交付”的配图骨架，共分两类：
+当前文档对外仅展示正式流程图和已采集的真实截图，避免把内部待补素材直接暴露给外部读者。
 
-1. 已有正式图或真实截图，可直接用于客户阅读
-2. 已经插入到正确步骤中的占位图，等待你用真实门户截图同名覆盖
+如果后续补充新的真实门户截图，建议优先覆盖以下操作节点：
 
-### 12.1 已完成的正式图与真实截图
+1. Entra Gallery 中的 GitHub Enterprise Managed User 搜索结果
+2. GitHub enterprise SAML 字段回填页
+3. Enterprise App 测试用户与 Enterprise Owner 角色分配页
+4. App Registration Overview 中的 Tenant ID 与 Client ID
+5. Client Secret 页面中的 Value 字段
+6. API permissions 与 Grant admin consent 页面
+7. Entra Groups 中用于 ENTRA_SYNC_GROUP_NAMES 的 displayName 列表
 
-1. 图 1-1：两个 Entra 对象的职责边界图
-2. 图 2-1：总体实施顺序图
-3. 图 4-1：Enterprise Application 创建路径图
-4. 图 4-3：Basic SAML Configuration 编辑入口截图
-5. 图 4-4：Base64 certificate 下载位置截图
-6. 图 4-5：Entra SSO 输出值截图
-7. 图 4-7：SAML 与 SCIM 关联图
-8. 图 5-1：App Registration 结构图
-9. 图 10-1：联调与验证顺序图
-
-### 12.2 待你补真实截图并直接覆盖的占位图
-
-1. 图 4-2：Entra Gallery 搜索 GitHub Enterprise Managed User
-    建议文件名：media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg
-2. 图 4-6：GitHub enterprise SAML 字段页
-    建议文件名：media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg
-3. 图 4-8：Enterprise App 用户与 Enterprise Owner 分配页
-    建议文件名：media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg
-4. 图 5-2：App Registration Overview 中的 Tenant ID / Client ID
-    建议文件名：media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg
-5. 图 5-3：Client Secret Value 复制页
-    建议文件名：media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg
-6. 图 6-1：API permissions 与 Grant admin consent
-    建议文件名：media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg
-7. 图 7-1：Entra Groups 中的 displayName 列表
-    建议文件名：media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg
+<!-- Internal screenshot replacement map:
+Figure 4-2 -> media/entra-id-app-registration-guide/enterprise-app-gallery-search-results-placeholder.svg
+Figure 4-6 -> media/entra-id-app-registration-guide/github-saml-settings-fields-placeholder.svg
+Figure 4-8 -> media/entra-id-app-registration-guide/enterprise-app-user-assignment-enterprise-owner-placeholder.svg
+Figure 5-2 -> media/entra-id-app-registration-guide/app-registration-overview-ids-placeholder.svg
+Figure 5-3 -> media/entra-id-app-registration-guide/client-secret-value-copy-placeholder.svg
+Figure 6-1 -> media/entra-id-app-registration-guide/api-permissions-admin-consent-placeholder.svg
+Figure 7-1 -> media/entra-id-app-registration-guide/entra-groups-display-name-placeholder.svg
+-->
 
 如果后续修改了本文中的 Mermaid 图，可以运行下面的脚本一键重新导出图片：
 
