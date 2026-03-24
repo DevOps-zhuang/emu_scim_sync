@@ -53,6 +53,21 @@ def test_load_settings_supports_logging_and_state_backend(monkeypatch):
     assert settings.state_store_backend == "local_json"
 
 
+def test_validate_settings_accepts_group_names_for_supported_entra_group_types(monkeypatch):
+    monkeypatch.setenv("ENTRA_TENANT_ID", "tenant")
+    monkeypatch.setenv("ENTRA_CLIENT_ID", "client")
+    monkeypatch.setenv("ENTRA_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("ENTRA_SYNC_GROUP_NAMES", "Security Group, Distribution Group")
+    monkeypatch.setenv("GITHUB_ENTERPRISE", "enterprise")
+    monkeypatch.setenv("GITHUB_PAT", "token")
+
+    settings = load_settings()
+
+    validate_settings(settings)
+
+    assert settings.entra_sync_group_names == ("Security Group", "Distribution Group")
+
+
 def test_validate_settings_rejects_invalid_group_delete_threshold(monkeypatch):
     monkeypatch.setenv("ENTRA_TENANT_ID", "tenant")
     monkeypatch.setenv("ENTRA_CLIENT_ID", "client")

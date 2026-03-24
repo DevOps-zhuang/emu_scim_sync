@@ -59,7 +59,7 @@ def run_once() -> int:
     )
 
     try:
-        resolved_groups = graph_client.resolve_security_groups_by_display_names(list(settings.entra_sync_group_names))
+        resolved_groups = graph_client.resolve_groups_by_display_names(list(settings.entra_sync_group_names))
         resolved_group_name_map = {
             resolved_group.configured_name: resolved_group.id for resolved_group in resolved_groups
         }

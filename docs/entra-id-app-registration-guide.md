@@ -77,7 +77,7 @@ Before you begin, confirm the following:
 - You have at least one of these roles: `Application Administrator` or `Cloud Application Administrator`
 - Your GitHub Enterprise is already enabled for Enterprise Managed Users
 - You can access the GitHub enterprise Identity provider configuration page as the setup user or an enterprise owner
-- You already know which Entra security groups define the sync scope
+- You already know which supported Entra groups define the sync scope, including security groups or distribution groups
 
 ## 4. Step 1: Create the SAML Enterprise Application for GitHub EMU sign-in
 
@@ -417,7 +417,7 @@ Otherwise, token acquisition may work while Graph reads still fail or return inc
 ### 7.1 Confirm the group display names in Entra
 
 1. Go to `Microsoft Entra ID -> Groups`
-2. Find the security groups that define the sync scope
+2. Find the supported Entra groups that define the sync scope
 3. Record each group's `displayName`
 4. Fill them into `ENTRA_SYNC_GROUP_NAMES`
 

@@ -2,9 +2,11 @@ import os
 
 import azure.functions as func
 
+from .config import load_environment
 from .main import run_once
 
 app = func.FunctionApp()
+load_environment()
 
 
 def _build_schedule(minutes: int) -> str:

@@ -6,7 +6,7 @@ This PoC implements user and group lifecycle sync from 21V Entra ID to GitHub EM
 
 ## Scope
 
-- Sync users from multiple Entra security groups configured by Entra group displayName.
+- Sync users from multiple Entra groups configured by displayName, including security groups and distribution groups.
 - Only direct members are in scope. Nested groups are not expanded.
 - User lifecycle: create, update, soft deprovision (active=false), reactivate, and optional hard delete for removed users.
 - Group lifecycle: create, update, and protected delete for GitHub Enterprise SCIM Groups.
@@ -46,7 +46,7 @@ This section describes a practical end-to-end flow for local validation before e
 ### 1. Prepare Entra and GitHub inputs
 
 - Create or confirm one Entra app registration with Microsoft Graph application permissions.
-- Confirm the Entra security groups that define the sync scope.
+- Confirm the Entra groups that define the sync scope, including supported security groups or distribution groups.
 - Confirm a GitHub classic PAT with `scim:enterprise`.
 - Confirm your GitHub Enterprise slug.
 
@@ -285,7 +285,7 @@ Set these application settings in Azure Functions:
 ## Group sync behavior
 
 - Configure source groups through `ENTRA_SYNC_GROUP_NAMES` with a comma-separated list of Entra group display names.
-- The syncer resolves each group name to one Entra security group and fails closed when a group is missing or ambiguous.
+- The syncer resolves each group name to one supported Entra group and fails closed when a group is missing or ambiguous.
 - Users are collected from each group's direct members and deduplicated by Entra `id`.
 - Entra groups are synced to GitHub Enterprise SCIM Groups as IdP groups.
 - Group-to-Team binding is intentionally not automated in this phase.

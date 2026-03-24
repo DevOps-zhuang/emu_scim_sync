@@ -77,7 +77,7 @@ flowchart TD
 - 具备以下至少一种角色：`Application Administrator` 或 `Cloud Application Administrator`
 - GitHub Enterprise 已启用 Enterprise Managed Users
 - 你能以 enterprise setup user 或 enterprise owner 身份进入 GitHub enterprise 的 Identity provider 配置页
-- 已明确本项目要同步的 Entra 安全组名称
+- 已明确本项目要同步的 Entra 组名称，当前支持安全组和分发组
 
 ## 4. 步骤 1：新建 SAML Enterprise App，用于 GitHub EMU 登录
 
@@ -440,7 +440,7 @@ ENTRA_CLIENT_SECRET=your-secret-value
 ### 7.1 在 Entra 中确认组 displayName
 
 1. 进入 `Microsoft Entra ID -> Groups`
-2. 找到要纳入同步范围的安全组
+2. 找到要纳入同步范围的 Entra 组，当前支持安全组和分发组
 3. 记录这些组的 `displayName`
 4. 填入 `ENTRA_SYNC_GROUP_NAMES`
 
@@ -453,7 +453,7 @@ ENTRA_SYNC_GROUP_NAMES=GitHub-EMU-Platform,GitHub-EMU-SRE,SanhuaGroup
 
 重要语义：
 
-- 当前实现按 displayName 解析目标安全组
+- 当前实现按 displayName 解析目标 Entra 组，支持安全组和分发组
 - 如果组名不存在或出现歧义，程序会 fail closed
 - 当前仅取 direct members，不展开 nested groups
 

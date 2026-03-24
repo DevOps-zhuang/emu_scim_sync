@@ -98,12 +98,15 @@ class EntraGraphClient:
     def _escape_odata_string(value: str) -> str:
         return value.replace("'", "''")
 
-    def resolve_security_groups_by_display_names(self, group_names: List[str]) -> List[ResolvedGroup]:
+    def resolve_groups_by_display_names(self, group_names: List[str]) -> List[ResolvedGroup]:
         resolved_groups: List[ResolvedGroup] = []
 
         for configured_name in group_names:
             params = {
-                "$filter": f"displayName eq '{self._escape_odata_string(configured_name)}' and securityEnabled eq true",
+                "$filter": (
+                    f"displayName eq '{self._escape_odata_string(configured_name)}' "
+                    "and (securityEnabled eq true or mailEnabled eq true)"
+                ),
                 "$select": "id,displayName",
             }
             raw_groups = self._get_paginated(f"{self.graph_base_url}/groups", params=params)

@@ -6,7 +6,7 @@
 
 ## 范围
 
-- 按 Entra 组 displayName 配置多个源安全组。
+- 按 Entra 组 displayName 配置多个源组，支持安全组和分发组。
 - 仅同步 direct members，不展开 nested groups。
 - 用户生命周期支持：创建、更新、软停用（`active=false`）、重新启用，以及可选的移除后硬删除。
 - 组生命周期支持：创建、更新，以及带保护策略的 GitHub Enterprise SCIM Group 删除。
@@ -46,7 +46,7 @@ python -m src.main
 ### 1. 准备 Entra 与 GitHub 输入项
 
 - 准备一个可调用 Microsoft Graph 的 Entra App Registration。
-- 确认定义同步范围的 Entra 安全组。
+- 确认定义同步范围的 Entra 组，当前支持安全组和分发组。
 - 准备一个具备 `scim:enterprise` 的 GitHub classic PAT。
 - 确认 GitHub Enterprise slug。
 
@@ -282,7 +282,7 @@ python -m src.main
 ## 组同步行为
 
 - 通过 `ENTRA_SYNC_GROUP_NAMES` 配置源组列表，多个 displayName 用逗号分隔。
-- 程序会把每个组名解析到唯一的 Entra security group，若缺失或歧义会 fail closed。
+- 程序会把每个组名解析到唯一的受支持 Entra 组，若缺失或歧义会 fail closed。
 - 用户从各组 direct members 收集，并按 Entra `id` 去重。
 - Entra 组会同步到 GitHub Enterprise SCIM Groups。
 - 当前阶段不自动做 group-to-team 绑定。
